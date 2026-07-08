@@ -2,6 +2,7 @@ version: "3.4"
 
 services:
   api:
+    container_name: dpr-saleor-api
     image: ghcr.io/saleor/saleor:3.20
     ports:
       - 8000:8000
@@ -26,12 +27,14 @@ services:
       - ALLOWED_HOSTS=localhost,api
 
   dashboard:
+    container_name: dpr-saleor-dashboard
     image: ghcr.io/saleor/saleor-dashboard:latest
     ports:
       - 9000:80
     restart: unless-stopped
 
   db:
+    container_name: saleor-postgresql
     image: library/postgres:15-alpine
     ports:
       - 5432:5432
@@ -42,8 +45,8 @@ services:
       - saleor-db:/var/lib/postgresql/data
       - ./replica_user.sql:/docker-entrypoint-initdb.d/replica_user.sql
     environment:
-      - POSTGRES_USER=saleor
-      - POSTGRES_PASSWORD=saleor
+      - POSTGRES_USER=d2r_saleor
+      - POSTGRES_PASSWORD=d2r!Saleor
 
   redis:
     image: library/redis:7.0-alpine
