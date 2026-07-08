@@ -1,7 +1,6 @@
-version: "3.4"
-
 services:
   api:
+    image: ghcr.io/saleor/saleor:3.23
     container_name: dpr-saleor-api
     image: ghcr.io/saleor/saleor:3.20
     ports:
@@ -13,7 +12,7 @@ services:
     tty: true
     depends_on:
       - db
-      - redis
+      - cache
       - jaeger
     volumes:
       # shared volume between worker and api for media
@@ -22,13 +21,11 @@ services:
       - common.env
       - backend.env
     environment:
-      - JAEGER_AGENT_HOST=jaeger
       - DASHBOARD_URL=http://localhost:9000/
-      - ALLOWED_HOSTS=localhost,api
+      - ALLOWED_HOSTS=localhost,127.0.0.1,api
 
   dashboard:
-    container_name: dpr-saleor-dashboard
-    image: ghcr.io/saleor/saleor-dashboard:latest
+    image: ghcr.io/saleor/saleor-dashboard:3.23
     ports:
       - 9000:80
     restart: unless-stopped
@@ -43,23 +40,23 @@ services:
       - saleor-backend-tier
     volumes:
       - saleor-db:/var/lib/postgresql/data
-      - ./replica_user.sql:/docker-entrypoint-initdb.d/replica_user.sql
+      - ./replica_user.sql:/docker-entrypoint-initdb.d/replica_user.sql:ro,z
     environment:
       - POSTGRES_USER=d2r_saleor
       - POSTGRES_PASSWORD=d2r!Saleor
 
-  redis:
-    image: library/redis:7.0-alpine
+  cache:
+    image: valkey/valkey:8.1-alpine
     ports:
       - 6379:6379
     restart: unless-stopped
     networks:
       - saleor-backend-tier
     volumes:
-      - saleor-redis:/data
+      - saleor-cache:/data
 
   worker:
-    image: ghcr.io/saleor/saleor:3.20
+    image: ghcr.io/saleor/saleor:3.23
     command: celery -A saleor --app=saleor.celeryconf:app worker --loglevel=info -B
     restart: unless-stopped
     networks:
@@ -68,22 +65,18 @@ services:
       - common.env
       - backend.env
     depends_on:
-      - redis
+      - cache
       - mailpit
     volumes:
       # shared volume between worker and api for media
       - saleor-media:/app/media
 
   jaeger:
-    image: jaegertracing/all-in-one
+    image: jaegertracing/jaeger
     ports:
-      - "5775:5775/udp"
-      - "6831:6831/udp"
-      - "6832:6832/udp"
-      - "5778:5778"
       - "16686:16686"
-      - "14268:14268"
-      - "9411:9411"
+      - "4317:4317"
+      - "4318:4318"
     restart: unless-stopped
     networks:
       - saleor-backend-tier
@@ -103,7 +96,7 @@ services:
 volumes:
   saleor-db:
     driver: local
-  saleor-redis:
+  saleor-cache:
     driver: local
   saleor-media:
 

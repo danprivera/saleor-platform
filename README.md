@@ -9,6 +9,15 @@
 </div>
 
 <div align="center">
+ Get to know Saleor: <br>
+  <a href="https://saleor.typeform.com/talk-with-us?utm_source=github&utm_medium=readme&utm_campaign=repo_platform">Talk to a human</a>
+  <span> | </span>
+  <a href="https://cloud.saleor.io/signup?utm_source=github&utm_medium=readme&utm_campaign=repo_platform">Talk to the API</a>
+</div>
+
+<br>
+
+<div align="center">
   <a href="https://saleor.io/">🏠 Website</a>
   <span> • </span>
   <a href="https://docs.saleor.io/docs/3.x/">📚 Docs</a>
@@ -48,10 +57,10 @@ git clone https://github.com/saleor/saleor-platform.git
 
 ## How to run it?
 
-1. We are using shared folders to enable live code reloading. Without this, Docker Compose will not start:
-    - Windows/MacOS: Add the cloned `saleor-platform` directory to Docker shared directories (Preferences -> Resources -> File sharing).
-    - Windows/MacOS: Make sure that in Docker preferences you have dedicated at least 5 GB of memory (Preferences -> Resources -> Advanced).
-    - Linux: No action is required, sharing is already enabled and memory for the Docker engine is not limited.
+1. Project is using shared folders to enable live code reloading. For `macOS` and `Windows` users following steps are required to run `Docker compose`:
+    - Add the cloned `saleor-platform` directory to Docker shared directories (Preferences -> Resources -> File sharing).
+    - In Docker preferences dedicate at least 5 GB of memory (Preferences -> Resources -> Advanced).
+
 
 2. Go to the cloned directory:
 ```shell
