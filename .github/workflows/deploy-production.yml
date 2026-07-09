@@ -1,0 +1,72 @@
+name: Deploy Saleor to Azure Container Apps (Production)
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_image_tag:
+        description: "Image tag for ghcr.io/saleor/saleor"
+        required: false
+        default: "3.23"
+      dashboard_image_tag:
+        description: "Image tag for ghcr.io/saleor/saleor-dashboard"
+        required: false
+        default: "3.23"
+      run_migrations:
+        description: "Run the saleor-migrate job after updating the API image"
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  RESOURCE_GROUP: rg-rover-saleor-prod
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Update saleor-api image
+        run: |
+          az containerapp update \
+            --name saleor-api \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --image ghcr.io/saleor/saleor:${{ inputs.api_image_tag }}
+
+      - name: Update saleor-worker image
+        run: |
+          az containerapp update \
+            --name saleor-worker \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --image ghcr.io/saleor/saleor:${{ inputs.api_image_tag }}
+
+      - name: Update saleor-beat image
+        run: |
+          az containerapp update \
+            --name saleor-beat \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --image ghcr.io/saleor/saleor:${{ inputs.api_image_tag }}
+
+      - name: Update saleor-dashboard image
+        run: |
+          az containerapp update \
+            --name saleor-dashboard \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --image ghcr.io/saleor/saleor-dashboard:${{ inputs.dashboard_image_tag }}
+
+      - name: Run database migrations
+        if: ${{ inputs.run_migrations == true || inputs.run_migrations == 'true' }}
+        run: |
+          az containerapp job start \
+            --name saleor-migrate \
+            --resource-group ${{ env.RESOURCE_GROUP }}

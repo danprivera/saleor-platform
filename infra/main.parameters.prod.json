@@ -1,0 +1,27 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentName": { "value": "prod" },
+    "location": { "value": "eastus2" },
+    "containerAppsEnvironmentName": { "value": "rover-ai-env" },
+    "logAnalyticsName": { "value": "log-rover-saleor-prod" },
+    "storageAccountName": { "value": "strovershopmediaprod" },
+    "identityName": { "value": "id-rover-saleor-prod" },
+    "keyVaultName": { "value": "rover-technologies-vault" },
+    "keyVaultResourceGroup": { "value": "rover-technologies-rg" },
+    "apiImageTag": { "value": "3.23" },
+    "dashboardImageTag": { "value": "3.23" },
+    "allowedHosts": { "value": "api.rovershop.io,saleor-api.happydune-4b5dd51b.eastus2.azurecontainerapps.io" },
+    "allowedGraphqlOrigins": { "value": "https://admin.rovershop.io" },
+    "publicUrl": { "value": "https://api.rovershop.io" },
+    "dashboardUrl": { "value": "https://admin.rovershop.io" },
+    "apiGraphqlUrl": { "value": "https://api.rovershop.io/graphql/" },
+    "defaultFromEmail": { "value": "noreply@rovershop.io" },
+    "workerMaxReplicas": { "value": 1 },
+    "apiMaxReplicas": { "value": 3 },
+    "postgresServerName": { "value": "psql-rover-saleor-prod-04" },
+    "postgresAvailabilityZone": { "value": "1" },
+    "postgresSkuName": { "value": "Standard_B1ms" }
+  }
+}

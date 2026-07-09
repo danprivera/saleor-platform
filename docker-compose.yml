@@ -1,8 +1,7 @@
 services:
   api:
     image: ghcr.io/saleor/saleor:3.23
-    container_name: dpr-saleor-api
-    image: ghcr.io/saleor/saleor:3.20
+    container_name: dpr-saleor-api  
     ports:
       - 8000:8000
     restart: unless-stopped
