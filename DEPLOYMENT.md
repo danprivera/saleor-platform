@@ -173,6 +173,11 @@ az containerapp job start --name saleor-migrate --resource-group rg-rover-saleor
 az containerapp job start --name saleor-createsuperuser --resource-group rg-rover-saleor-prod
 ```
 
+Already created and verified working (`admin@rovershop.io`, credentials in Key Vault
+`saleor-admin-email`/`saleor-admin-password`). To verify login without opening the dashboard,
+send a `tokenCreate` mutation to `/graphql/` — an empty `errors` array with a `token` confirms
+the account works.
+
 ### Deploy a new image version
 
 Use the "Deploy Saleor to Azure Container Apps (Production)" GitHub Actions workflow
@@ -193,6 +198,34 @@ Requires a CNAME (and TXT `asuid.<hostname>` for validation) added at GoDaddy po
 container app's default FQDN before binding. Repeat for `saleor-dashboard` / `admin.rovershop.io`.
 Managed certificate issuance can take up to 20 minutes after binding (in practice both were
 `Succeeded` almost immediately for this deployment).
+
+## Troubleshooting notes
+
+- **Reading logs for a specific revision/replica**: `az containerapp logs show --type system` does
+  not support `--container`/`--replica`/`--revision` filters — omit `--type system` (default console
+  logs) when scoping to a revision.
+- **Testing before a custom domain is bound**: Container Apps ingress routes by `Host` header at the
+  environment level, so overriding `Host` via curl against the default FQDN for an unbound hostname
+  just returns a generic environment 404, not the app's response. To smoke-test the API before DNS/
+  domain binding is complete, allow-list the app's own default FQDN in `ALLOWED_HOSTS` instead.
+- **Azure Portal can show stale/cached resource lists** (e.g. showed 4 Postgres servers after
+  earlier ones were deleted, when only one actually existed). Always cross-check with
+  `az postgres flexible-server list` / `az resource list` before assuming a portal-displayed
+  resource is real.
+- **`ScaledObject doesn't have correct triggers specification` warning** on `saleor-worker`/
+  `saleor-beat` is cosmetic — both are pinned at `minReplicas == maxReplicas == 1`, so no scale
+  rules are needed.
+- **PowerShell + curl JSON bodies**: inline `curl.exe -d '{"query":"..."}'` from PowerShell mangles
+  quoting, and `Out-File -Encoding utf8` can add a BOM that breaks JSON parsing. Reliable approach:
+  `[System.IO.File]::WriteAllText($path, $jsonString)` then `curl.exe --data-binary "@$path"`.
+- **Generating an RSA key without `openssl`** (not available in this Windows PowerShell
+  environment): use Python's `cryptography` library (`rsa.generate_private_key` +
+  `private_bytes(..., format=TraditionalOpenSSL, encryption_algorithm=NoEncryption())`), write to a
+  temp file, upload with `az keyvault secret set --file`, then delete the local plaintext file.
+- **A long-running `az deployment group create` can appear to fail client-side** ("Long-running
+  operation wait cancelled") if another terminal command runs concurrently in the same session —
+  the actual Azure-side deployment is unaffected; confirm with
+  `az deployment group show --query properties.provisioningState`.
 
 ## Roadmap
 
