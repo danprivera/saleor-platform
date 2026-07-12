@@ -13,7 +13,7 @@
     "apiImageTag": { "value": "3.23" },
     "dashboardImageTag": { "value": "3.23" },
     "allowedHosts": { "value": "api.rovershop.io,saleor-api.happydune-4b5dd51b.eastus2.azurecontainerapps.io" },
-    "allowedGraphqlOrigins": { "value": "https://admin.rovershop.io" },
+    "allowedGraphqlOrigins": { "value": "https://admin.rovershop.io,https://rovershop.ai,https://*.rovershop.ai,https://deliajewelry.com,https://www.deliajewelry.com,https://*.azurecontainerapps.io,http://localhost:3000" },
     "publicUrl": { "value": "https://api.rovershop.io" },
     "dashboardUrl": { "value": "https://admin.rovershop.io" },
     "apiGraphqlUrl": { "value": "https://api.rovershop.io/graphql/" },
