@@ -18,6 +18,8 @@ record).
 | Per-channel `featured-products-{channel}` collections | ✅ Done |
 | Provisioning pattern | ✅ Proven twice, idempotent (`scripts/provision-*.mjs`) |
 | Automated provisioning (MCP tools / portal) | ⏳ Not started — explicit next phase |
+| First Saleor app token | ✅ 2026-07-11 — app `rovershop-vendor-dashboard` (`QXBwOjE=`), MANAGE_PRODUCTS + MANAGE_ORDERS, token in Key Vault `rovershop-dashboard-saleor-app-token`; powers dashboard product CRUD (non-expiring, replaces admin-JWT pattern for the dashboard) |
+| Product media / blob storage | ✅ **Fixed 2026-07-11** — media upload had never worked: Saleor called `strovershopmediaprod` over plain HTTP → `AccountRequiresHttps`. `AZURE_SSL=True` set on `saleor-api` + `saleor-worker` (revisions `--0000005`). `productMediaCreate` verified working. |
 
 ## Next steps
 

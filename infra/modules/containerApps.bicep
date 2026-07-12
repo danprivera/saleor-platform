@@ -98,6 +98,8 @@ var commonEnv = [
   { name: 'AZURE_CONTAINER', value: 'media' }
   { name: 'AZURE_ACCOUNT_NAME', value: storageAccountName }
   { name: 'AZURE_ACCOUNT_KEY', secretRef: 'storage-account-key' }
+  // Storage account rejects plain HTTP (AccountRequiresHttps) — Saleor defaults to HTTP without this
+  { name: 'AZURE_SSL', value: 'True' }
 ]
 
 // Internal-only cache/broker. TCP ingress so it's reachable from other apps
