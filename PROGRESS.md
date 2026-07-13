@@ -70,6 +70,16 @@ storefront gateway id can stay `app.saleor.stripe` until the fork renames it (re
 updating the checkout's `stripeGatewayId` + reinstall). Infra TODO: pin `rover-pay` in bicep
 (it was created imperatively) and bind api.roverpay.ai when the product brand goes live.
 
+## ⚠️ Provisioning gap found 2026-07-13: shipping-method channel listings
+
+A real payment got stuck ("Almost done…" hang; charged but uncompletable checkout) because the
+**Default shipping method had a channel listing (price) only for `default-channel`** — the
+vendor channels had zero available shipping methods, so shipping-required checkouts could
+never complete. Zone assignment (`addShippingZones` at channelCreate) is **not enough**:
+every new channel also needs `shippingMethodChannelListingUpdate` with
+`addChannels: [{ channelId, price }]` for each method it should offer. Fixed live for
+`deliajewelry`/`illnails` ($0 listings); **add this step to the provisioning scripts/portal.**
+
 ## Next steps
 
 1. **Wrap the provisioning-script pattern as MCP tools and/or a vendor-provisioning portal** so
