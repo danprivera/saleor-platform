@@ -21,6 +21,36 @@ record).
 | First Saleor app token | ✅ 2026-07-11 — app `rovershop-vendor-dashboard` (`QXBwOjE=`), MANAGE_PRODUCTS + MANAGE_ORDERS, token in Key Vault `rovershop-dashboard-saleor-app-token`; powers dashboard product CRUD (non-expiring, replaces admin-JWT pattern for the dashboard) |
 | Product media / blob storage | ✅ **Fixed 2026-07-11** — media upload had never worked: Saleor called `strovershopmediaprod` over plain HTTP → `AccountRequiresHttps`. `AZURE_SSL=True` set on `saleor-api` + `saleor-worker` (revisions `--0000005`). `productMediaCreate` verified working. |
 
+## Rover Pay (payments container, added 2026-07-12)
+
+Container app **`rover-pay`** (rg-rover-saleor-prod, `rover-ai-env`) runs the Saleor Stripe
+payment app — image `ghcr.io/djkato/saleor-app-payment-stripe:0.4.0` (community dockerization
+of saleor/saleor-app-payment-stripe; **listens on port 3000**, not the 3001 its compose example
+suggests). Env: `SECRET_KEY` (KV `rover-pay-app-secret-key`), `APL=redis`,
+`REDIS_URL=redis://valkey:6379/5`, `APP_API_BASE_URL`/`APP_IFRAME_BASE_URL`. Custom domain
+**pay.rovershop.io** (CNAME + `asuid.pay` TXT at the registrar) because Saleor's SSRF guard
+(`HTTP_IP_FILTER_ENABLED=True`) blocks same-environment FQDNs, which resolve to private IPs —
+app installs/webhooks require a publicly-resolving host. Manifest id `app.saleor.stripe`
+matches the storefront checkout's `stripeGatewayId`; when a channel has a mapped config the
+checkout's Stripe card UI automatically replaces the PayLater fallback.
+
+**Stripe sandbox config**: keys in KV — `rovershop-stripe-sandbox-secret-key` (sk_test, the
+app rejects restricted rk_ keys), `-publishable-key` (pk_test), `-api-key` (rk_test, unused by
+this app). Config entry "RoverShop sandbox" is mapped to every channel so all vendors test
+through the shared sandbox; per-vendor Stripe accounts come later. Configuration is scriptable:
+the app's tRPC (`/api/trpc/paymentConfig.add`, `mapping.update`) accepts a Saleor staff JWT via
+`authorization-bearer` + `saleor-api-url` headers (needs MANAGE_APPS + MANAGE_SETTINGS; the
+`Origin` header must be the app URL — it's used to build the auto-created Stripe webhook).
+
+**Rover Pay evolution plan**: this container is the seed of Rover Pay (roverpay.ai). Path:
+fork `saleor/saleor-app-payment-stripe` → `rover-pay` repo; keep the transaction-flow webhook
+surface (`PAYMENT_GATEWAY_INITIALIZE_SESSION`, `TRANSACTION_INITIALIZE/PROCESS/...`) and add
+processors behind per-vendor configuration entries (the app's config-entry + channel-mapping
+model already supports N configs → N channels — exactly the multi-vendor shape needed). The
+storefront gateway id can stay `app.saleor.stripe` until the fork renames it (renaming requires
+updating the checkout's `stripeGatewayId` + reinstall). Infra TODO: pin `rover-pay` in bicep
+(it was created imperatively) and bind api.roverpay.ai when the product brand goes live.
+
 ## Next steps
 
 1. **Wrap the provisioning-script pattern as MCP tools and/or a vendor-provisioning portal** so
