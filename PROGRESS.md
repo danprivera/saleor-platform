@@ -21,26 +21,45 @@ record).
 | First Saleor app token | ✅ 2026-07-11 — app `rovershop-vendor-dashboard` (`QXBwOjE=`), MANAGE_PRODUCTS + MANAGE_ORDERS, token in Key Vault `rovershop-dashboard-saleor-app-token`; powers dashboard product CRUD (non-expiring, replaces admin-JWT pattern for the dashboard) |
 | Product media / blob storage | ✅ **Fixed 2026-07-11** — media upload had never worked: Saleor called `strovershopmediaprod` over plain HTTP → `AccountRequiresHttps`. `AZURE_SSL=True` set on `saleor-api` + `saleor-worker` (revisions `--0000005`). `productMediaCreate` verified working. |
 
-## Rover Pay (payments container, added 2026-07-12)
+## Rover Pay (payments service, added 2026-07-12, LIVE & E2E-verified 2026-07-13)
 
-Container app **`rover-pay`** (rg-rover-saleor-prod, `rover-ai-env`) runs the Saleor Stripe
-payment app — image `ghcr.io/djkato/saleor-app-payment-stripe:0.4.0` (community dockerization
-of saleor/saleor-app-payment-stripe; **listens on port 3000**, not the 3001 its compose example
-suggests). Env: `SECRET_KEY` (KV `rover-pay-app-secret-key`), `APL=redis`,
-`REDIS_URL=redis://valkey:6379/5`, `APP_API_BASE_URL`/`APP_IFRAME_BASE_URL`. Custom domain
-**pay.rovershop.io** (CNAME + `asuid.pay` TXT at the registrar) because Saleor's SSRF guard
-(`HTTP_IP_FILTER_ENABLED=True`) blocks same-environment FQDNs, which resolve to private IPs —
-app installs/webhooks require a publicly-resolving host. Manifest id `app.saleor.stripe`
-matches the storefront checkout's `stripeGatewayId`; when a channel has a mapped config the
-checkout's Stripe card UI automatically replaces the PayLater fallback.
+**Live at `https://api.roverpay.io`** — container app **`rover-pay`** in its **own environment
+`rover-pay-env` (rg-rover-pay-prod)** with a private `valkey` sidecar app (APL storage). Runs
+the Saleor Stripe payment app — image `ghcr.io/djkato/saleor-app-payment-stripe:0.4.0`
+(community dockerization of saleor/saleor-app-payment-stripe; **listens on port 3000**, not
+the 3001 its compose example suggests). Env: `SECRET_KEY` (KV `rover-pay-app-secret-key`),
+`APL=redis`, `REDIS_URL=redis://valkey:6379/0`, `APP_API_BASE_URL`/`APP_IFRAME_BASE_URL`
+(**required** — RedisAPL throws without APP_API_BASE_URL, every request 500s). Installed in
+Saleor as app `QXBwOjM=` ("Rover Pay (Stripe sandbox)"), manifest id `app.saleor.stripe` =
+the storefront checkout's `stripeGatewayId`; with a channel mapped, the Stripe card UI
+automatically replaces the PayLater fallback.
+
+**Why its own environment**: Saleor's SSRF guard (`HTTP_IP_FILTER_ENABLED=True`) blocks
+targets resolving to private IPs, and **within an ACA environment every same-env FQDN —
+including custom domains CNAME'd to it — resolves internally**. A custom domain alone does
+NOT help; the app must live in a different environment (or the filter must be disabled).
+Also: Saleor retries `install_app_task` with backoff — a first "Failed to connect to app"
+installation attempt can still succeed ~1 min later, leaving a surprise app registration
+(poll `appsInstallations` until the row disappears rather than failing on first FAILED).
 
 **Stripe sandbox config**: keys in KV — `rovershop-stripe-sandbox-secret-key` (sk_test, the
 app rejects restricted rk_ keys), `-publishable-key` (pk_test), `-api-key` (rk_test, unused by
-this app). Config entry "RoverShop sandbox" is mapped to every channel so all vendors test
-through the shared sandbox; per-vendor Stripe accounts come later. Configuration is scriptable:
-the app's tRPC (`/api/trpc/paymentConfig.add`, `mapping.update`) accepts a Saleor staff JWT via
-`authorization-bearer` + `saleor-api-url` headers (needs MANAGE_APPS + MANAGE_SETTINGS; the
-`Origin` header must be the app URL — it's used to build the auto-created Stripe webhook).
+this app). Config entry "RoverShop sandbox" (Stripe webhook auto-created:
+`we_1TsZPZKCiofHBeSmDeYlhHst`) is mapped to **all three channels** so every vendor transacts
+through the shared sandbox; per-vendor Stripe accounts come later. Config auth gotcha: the
+app's tRPC requires a JWT whose `app` claim matches the app ID — plain admin `tokenCreate`
+JWTs are REJECTED; configure via the admin dashboard UI (its iframe gets app-scoped tokens),
+or capture that token from the iframe's requests and replay tRPC calls
+(`paymentAppConfigurationRouter.paymentConfig.add` / `.mapping.update`; no superjson — raw
+JSON in/out; `Origin` header must be the app URL, it builds the Stripe webhook URL).
+The app's channel-mapping UI shows no rows on self-hosted installs (its channels fetch comes
+back empty) — `mapping.update` works regardless, it only validates the config entry.
+
+**E2E-verified 2026-07-13**: prod storefront checkout with test card 4242→ Stripe
+paymentIntent confirmed → Saleor order **Paid** in the vendor dashboard (orders #9/#10,
+`stripe-e2e@`/`stripe-prod-e2e@example.com`). Full loop: storefront → Stripe Elements →
+rover-pay webhooks → Saleor transaction → dashboard Orders (Fulfill enabled, Mark-as-Paid
+correctly hidden).
 
 **Rover Pay evolution plan**: this container is the seed of Rover Pay (roverpay.ai). Path:
 fork `saleor/saleor-app-payment-stripe` → `rover-pay` repo; keep the transaction-flow webhook
