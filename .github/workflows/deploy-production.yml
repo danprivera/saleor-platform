@@ -70,3 +70,11 @@ jobs:
           az containerapp job start \
             --name saleor-migrate \
             --resource-group ${{ env.RESOURCE_GROUP }}
+
+      - name: Notify storefront to regenerate GraphQL types
+        env:
+          GH_TOKEN: ${{ secrets.STOREFRONT_DISPATCH_TOKEN }}
+        run: |
+          gh api repos/danprivera/rovershop-storefront/dispatches \
+            -f event_type=saleor-deployed \
+            -f "client_payload[api_image_tag]=${{ inputs.api_image_tag }}"
