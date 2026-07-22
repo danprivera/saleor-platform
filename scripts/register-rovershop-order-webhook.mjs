@@ -53,6 +53,16 @@ const SUBSCRIPTION_QUERY = `subscription {
 				userEmail
 				total { gross { amount currency } }
 				metadata { key value }
+				billingAddress {
+					firstName
+					lastName
+					streetAddress1
+					streetAddress2
+					city
+					countryArea
+					postalCode
+					country { code }
+				}
 				lines {
 					productName
 					quantity
@@ -153,6 +163,28 @@ async function main() {
 		if (webhook.targetUrl !== targetUrl) {
 			console.warn(`  WARNING: existing targetUrl "${webhook.targetUrl}" differs from expected "${targetUrl}" — not auto-updating; review manually.`);
 		}
+		// Update the subscription query + secret in place so schema changes to
+		// SUBSCRIPTION_QUERY (e.g. adding billingAddress) actually reach Saleor —
+		// the query is stored ON the webhook, not read from this script at
+		// delivery time, so without this an existing webhook keeps sending the
+		// old payload shape forever. Idempotent: re-running with an unchanged
+		// query is a no-op update.
+		const updated = await saleor(
+			`mutation($id: ID!, $input: WebhookUpdateInput!) {
+				webhookUpdate(id: $id, input: $input) { webhook { id } errors { field message code } }
+			}`,
+			{
+				id: webhook.id,
+				input: {
+					query: SUBSCRIPTION_QUERY,
+					secretKey: SALEOR_ORDER_WEBHOOK_SECRET,
+					asyncEvents: ["ORDER_CREATED"],
+					isActive: true,
+				},
+			},
+		);
+		assertNoErrors(updated, "webhookUpdate", "webhookUpdate");
+		console.log(`  updated webhook ${webhook.id} subscription query + secret`);
 	}
 
 	console.log("Done.");
