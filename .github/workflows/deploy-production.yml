@@ -12,10 +12,17 @@ on:
         required: false
         default: "3.23"
       run_migrations:
-        description: "Run the saleor-migrate job after updating the API image"
+        # Defaults to TRUE deliberately. It used to default to false, and that
+        # is how the 3.23 image ran against a pre-3.23 schema for ten days:
+        # every staff login failed with
+        #   UndefinedColumn: column account_user.customer_type_id does not exist
+        # while reads kept returning 200, so nothing surfaced it. Running a
+        # migration is the NORMAL case when the image version changes; skipping
+        # it should be the deliberate act. See rover-strapi#104 / #106.
+        description: "Run the saleor-migrate job after updating the API image (leave ON unless you know the schema is unchanged)"
         type: boolean
         required: false
-        default: false
+        default: true
 
 permissions:
   id-token: write
@@ -23,6 +30,7 @@ permissions:
 
 env:
   RESOURCE_GROUP: rg-rover-saleor-prod
+  SALEOR_API_URL: https://api.rovershop.io/graphql/
 
 jobs:
   deploy:
@@ -67,9 +75,59 @@ jobs:
       - name: Run database migrations
         if: ${{ inputs.run_migrations == true || inputs.run_migrations == 'true' }}
         run: |
-          az containerapp job start \
+          set -euo pipefail
+          # `job start` returns as soon as the job is QUEUED, so without polling
+          # a failed migration passes silently and the deploy goes green over a
+          # broken schema — exactly what happened in rover-strapi#104.
+          EXEC=$(az containerapp job start \
             --name saleor-migrate \
-            --resource-group ${{ env.RESOURCE_GROUP }}
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query name -o tsv)
+          echo "migration execution: $EXEC"
+
+          for i in $(seq 1 60); do
+            STATUS=$(az containerapp job execution show \
+              --name saleor-migrate \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --job-execution-name "$EXEC" \
+              --query properties.status -o tsv)
+            echo "  [$i] $STATUS"
+            case "$STATUS" in
+              Succeeded) echo "migrations applied"; break ;;
+              Failed|Cancelled)
+                echo "::error::saleor-migrate $STATUS — the schema may be behind the image. Deploy aborted."
+                exit 1 ;;
+            esac
+            if [ "$i" -eq 60 ]; then
+              echo "::error::saleor-migrate did not reach a terminal state in 10 minutes."
+              exit 1
+            fi
+            sleep 10
+          done
+
+      - name: Smoke-test staff login
+        # The check that would have caught rover-strapi#104 in seconds. A green
+        # deploy told us nothing: revision health was green and read queries
+        # returned 200 for the entire ten-day outage, because only the login
+        # mutation touched the missing column. Verification has to exercise a
+        # real write path, not just liveness.
+        #
+        # Needs no credentials. A schema mismatch surfaces as a top-level
+        # ProgrammingError / Internal Server Error; wrong credentials return a
+        # clean `errors` array, which is a PASS here.
+        run: |
+          set -euo pipefail
+          RESPONSE=$(curl -sS --max-time 30 -X POST \
+            -H 'Content-Type: application/json' \
+            -d '{"query":"mutation{tokenCreate(email:\"deploy-smoke-test@invalid.local\",password:\"x\"){token errors{field message}}}"}' \
+            "${{ env.SALEOR_API_URL }}")
+          echo "$RESPONSE"
+
+          if echo "$RESPONSE" | grep -qiE 'Internal Server Error|ProgrammingError|UndefinedColumn'; then
+            echo "::error::tokenCreate is raising a server error — Saleor's schema is very likely behind its image. Check the saleor-api logs for UndefinedColumn."
+            exit 1
+          fi
+          echo "staff login path is healthy (bad credentials rejected cleanly)"
 
       - name: Notify storefront to regenerate GraphQL types
         env:
