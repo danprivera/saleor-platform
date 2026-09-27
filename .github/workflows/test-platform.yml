@@ -7,7 +7,23 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+      # The test database lives only for this run, so it gets passwords that
+      # live only for this run: generated here, never a repository secret.
+      # PR code runs in this job and could print a shared secret, and fork PRs
+      # are given no secrets at all. Hex, so they are URL-safe in DATABASE_URL.
+      # Local development reads its own from Key Vault - see README.
+      - name: Generate throwaway database passwords
+        run: |
+          echo "::add-mask::$(openssl rand -hex 24 | tee /tmp/db)"
+          echo "::add-mask::$(openssl rand -hex 24 | tee /tmp/ro)"
+          echo "SALEOR_DB_PASSWORD=$(cat /tmp/db)" >> "$GITHUB_ENV"
+          echo "SALEOR_READ_ONLY_DB_PASSWORD=$(cat /tmp/ro)" >> "$GITHUB_ENV"
+          rm /tmp/db /tmp/ro
       - name: Build
         run: docker compose build
+      # Loopback is allowed alongside the cache: Saleor's own "tax app does
+      # not respond" tests connect to a closed local port and expect the
+      # refusal. Blocking loopback raised pytest-socket's error instead, which
+      # Saleor does not handle, and those two tests failed.
       - name: Run backend tests
-        run: docker compose run api pytest -n logical --allow-hosts cache
+        run: docker compose run api pytest -n logical --allow-hosts cache,localhost,127.0.0.1,::1
