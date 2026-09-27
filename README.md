@@ -72,7 +72,7 @@ cd saleor-platform
 echo "SALEOR_DB_PASSWORD=$(az keyvault secret show --vault-name rover-technologies-vault -n saleor-local-db-password --query value -o tsv)" > .env
 echo "SALEOR_READ_ONLY_DB_PASSWORD=$(az keyvault secret show --vault-name rover-technologies-vault -n saleor-local-db-readonly-password --query value -o tsv)" >> .env
 ```
-CI reads the same values from the repo secrets `SALEOR_LOCAL_DB_PASSWORD` / `SALEOR_LOCAL_DB_READONLY_PASSWORD`. If you rotate one in the vault, copy it to the secret: `az keyvault secret show ... --query value -o tsv | gh secret set SALEOR_LOCAL_DB_PASSWORD`. An existing `saleor-db` volume keeps its old password: `docker compose down -v` to re-initialise.
+The two vault secrets hold `saleor-local-db-password` → `SALEOR_DB_PASSWORD` and `saleor-local-db-readonly-password` → `SALEOR_READ_ONLY_DB_PASSWORD`. Keep them URL-safe when rotating (`openssl rand -hex 24`): the password is placed in `DATABASE_URL` as is. CI uses neither - it generates throwaway passwords for each run (`.github/workflows/test-platform.yml`). An existing `saleor-db` volume keeps its old password: `docker compose down -v` to re-initialise.
 
 4. Apply Django migrations:
 ```shell

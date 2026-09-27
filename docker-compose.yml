@@ -23,7 +23,8 @@ services:
       - DASHBOARD_URL=http://localhost:9000/
       - ALLOWED_HOSTS=localhost,127.0.0.1,api
       # Overrides backend.env: the password comes from the environment (Key Vault
-      # `saleor-local-db-password`; the GitHub secret of the same name in CI).
+      # `saleor-local-db-password` locally; generated per run in CI). It goes
+      # into the URL unencoded, so it must be URL-safe - hex, as generated.
       - DATABASE_URL=postgres://saleor:${SALEOR_DB_PASSWORD:?set SALEOR_DB_PASSWORD - see README}@db/saleor
 
   dashboard:
