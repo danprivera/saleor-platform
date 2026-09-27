@@ -35,10 +35,10 @@
  *   node scripts/register-rovershop-account-webhook.mjs
  */
 
-const SALEOR_API_URL = process.env.SALEOR_API_URL ?? "https://api.rovershop.io/graphql/";
+const SALEOR_API_URL = requireEnv("SALEOR_API_URL", "the target GraphQL endpoint, e.g. http://localhost:8000/graphql/");
 const SALEOR_ADMIN_EMAIL = requireEnv("SALEOR_ADMIN_EMAIL");
 const SALEOR_ADMIN_PASSWORD = requireEnv("SALEOR_ADMIN_PASSWORD");
-const STRAPI_API_URL = process.env.STRAPI_API_URL ?? "https://api.roverai.io";
+const STRAPI_API_URL = requireEnv("STRAPI_API_URL", "the target Strapi base URL, e.g. http://localhost:1337");
 const SALEOR_ACCOUNT_WEBHOOK_SECRET = requireEnv("SALEOR_ACCOUNT_WEBHOOK_SECRET");
 
 const WEBHOOK_NAME = "rovershop-account-events";
@@ -74,10 +74,12 @@ const SUBSCRIPTION_QUERY = `subscription {
 	}
 }`;
 
-function requireEnv(name) {
+function requireEnv(name, hint) {
 	const value = process.env[name];
 	if (!value) {
-		console.error(`Missing required env var ${name}`);
+		console.error(hint
+			? `Missing required env var ${name}: set it to ${hint}. It has no default, so a run never targets production by accident.`
+			: `Missing required env var ${name}`);
 		process.exit(1);
 	}
 	return value;

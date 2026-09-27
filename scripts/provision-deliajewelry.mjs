@@ -26,7 +26,7 @@
  *   node scripts/provision-deliajewelry.mjs
  */
 
-const SALEOR_API_URL = process.env.SALEOR_API_URL ?? "https://api.rovershop.io/graphql/";
+const SALEOR_API_URL = requireEnv("SALEOR_API_URL", "the target GraphQL endpoint, e.g. http://localhost:8000/graphql/");
 const SALEOR_ADMIN_EMAIL = requireEnv("SALEOR_ADMIN_EMAIL");
 const SALEOR_ADMIN_PASSWORD = requireEnv("SALEOR_ADMIN_PASSWORD");
 
@@ -108,10 +108,12 @@ const DEFAULT_CHANNEL_PRODUCTS = [
 	},
 ];
 
-function requireEnv(name) {
+function requireEnv(name, hint) {
 	const value = process.env[name];
 	if (!value) {
-		console.error(`Missing required env var ${name}`);
+		console.error(hint
+			? `Missing required env var ${name}: set it to ${hint}. It has no default, so a run never targets production by accident.`
+			: `Missing required env var ${name}`);
 		process.exit(1);
 	}
 	return value;

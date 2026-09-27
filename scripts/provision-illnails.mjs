@@ -17,20 +17,22 @@
  *   node scripts/provision-illnails.mjs
  */
 
-const SALEOR_API_URL = process.env.SALEOR_API_URL ?? "https://api.rovershop.io/graphql/";
+const SALEOR_API_URL = requireEnv("SALEOR_API_URL", "the target GraphQL endpoint, e.g. http://localhost:8000/graphql/");
 const SALEOR_ADMIN_EMAIL = requireEnv("SALEOR_ADMIN_EMAIL");
 const SALEOR_ADMIN_PASSWORD = requireEnv("SALEOR_ADMIN_PASSWORD");
-const STRAPI_API_URL = process.env.STRAPI_API_URL ?? "https://api.roverai.io";
+const STRAPI_API_URL = requireEnv("STRAPI_API_URL", "the target Strapi base URL, e.g. http://localhost:1337");
 const STRAPI_API_TOKEN = requireEnv("STRAPI_API_TOKEN");
 
 const VENDOR_CODE = "illnails";
 const CHANNEL_SLUG = "illnails";
 const CHANNEL_NAME = "Illmatic Nails";
 
-function requireEnv(name) {
+function requireEnv(name, hint) {
 	const value = process.env[name];
 	if (!value) {
-		console.error(`Missing required env var ${name}`);
+		console.error(hint
+			? `Missing required env var ${name}: set it to ${hint}. It has no default, so a run never targets production by accident.`
+			: `Missing required env var ${name}`);
 		process.exit(1);
 	}
 	return value;
