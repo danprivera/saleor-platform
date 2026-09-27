@@ -9,8 +9,9 @@ SNAPSHOT=$DIR"/update-automation-snapshot.sql"
 sed -i '' 's/update_automation_snapshot_staging_saleor_cloud/public/' $SNAPSHOT
 sed -i '' 's/update_automation_snapshot_staging_saleor_cloud/public/' $SNAPSHOT
 
-# please note that you should not use this password on production services
-DB_URL="postgresql://saleor:saleor@localhost:5432/"
+# The db container's password is SALEOR_DB_PASSWORD (see README), not a
+# committed one: user and database are both "saleor", as in docker-compose.yml.
+DB_URL="postgresql://saleor:${SALEOR_DB_PASSWORD:?set SALEOR_DB_PASSWORD - see README}@localhost:5432/"
 # use different database for testing purpose
 FULL_DB_URL=$DB_URL"e2e"
 
