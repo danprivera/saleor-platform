@@ -22,7 +22,7 @@ x-saleor-env: &saleor-env
 
 services:
   api:
-    image: ghcr.io/saleor/saleor:3.23
+    image: ghcr.io/saleor/saleor:3.23.36
     container_name: dpr-saleor-api  
     ports:
       - 8000:8000
@@ -83,7 +83,7 @@ services:
       - saleor-cache:/data
 
   worker:
-    image: ghcr.io/saleor/saleor:3.23
+    image: ghcr.io/saleor/saleor:3.23.36
     command: celery -A saleor --app=saleor.celeryconf:app worker --loglevel=info -B
     restart: unless-stopped
     networks:

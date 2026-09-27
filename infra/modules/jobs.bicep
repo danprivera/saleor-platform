@@ -11,7 +11,11 @@ param identityId string
 param keyVaultUri string
 
 @description('Image tag for ghcr.io/saleor/saleor.')
-param apiImageTag string = '3.23'
+// An EXACT patch, never a floating minor: any new revision (even an env var
+// change) re-pulls the tag, and a floating 3.23 moved 3.23.33 -> 3.23.36 on
+// 2026-09-27 without its migration - every orders query 500'd for ~15 hours.
+// Bump deliberately, and run saleor-migrate with it.
+param apiImageTag string = '3.23.36'
 
 @description('Storage account name used for Saleor media (Azure Blob Storage).')
 param storageAccountName string
