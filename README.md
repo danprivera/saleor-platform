@@ -67,18 +67,25 @@ git clone https://github.com/saleor/saleor-platform.git
 cd saleor-platform
 ```
 
-3. Apply Django migrations:
+3. Set the local database passwords. Compose refuses to start without them; nothing is committed. They live in Key Vault `rover-technologies-vault`, and `.env` is gitignored:
+```shell
+echo "SALEOR_DB_PASSWORD=$(az keyvault secret show --vault-name rover-technologies-vault -n saleor-local-db-password --query value -o tsv)" > .env
+echo "SALEOR_READ_ONLY_DB_PASSWORD=$(az keyvault secret show --vault-name rover-technologies-vault -n saleor-local-db-readonly-password --query value -o tsv)" >> .env
+```
+The two vault secrets hold `saleor-local-db-password` → `SALEOR_DB_PASSWORD` and `saleor-local-db-readonly-password` → `SALEOR_READ_ONLY_DB_PASSWORD`. Keep them URL-safe when rotating (`openssl rand -hex 24`): the password is placed in `DATABASE_URL` as is. CI uses neither - it generates throwaway passwords for each run (`.github/workflows/test-platform.yml`). An existing `saleor-db` volume keeps its old password: `docker compose down -v` to re-initialise.
+
+4. Apply Django migrations:
 ```shell
 docker compose run --rm api python3 manage.py migrate
 ```
 
-4. Populate the database with example data and create the admin user:
+5. Populate the database with example data and create the admin user:
 ```shell
 docker compose run --rm api python3 manage.py populatedb --createsuperuser
 ```
 *Note that `--createsuperuser` argument creates an admin account for `admin@example.com` with the password set to `admin`.*
 
-5. Run the application:
+6. Run the application:
 ```shell
 docker compose up
 ```
