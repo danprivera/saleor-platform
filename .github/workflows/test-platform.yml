@@ -4,6 +4,12 @@ on: pull_request
 jobs:
   verify_pull_request:
     runs-on: ubuntu-latest
+    # The throwaway test database's passwords. Source of truth: Key Vault
+    # rover-technologies-vault (saleor-local-db-password,
+    # saleor-local-db-readonly-password), copied to these repo secrets.
+    env:
+      SALEOR_DB_PASSWORD: ${{ secrets.SALEOR_LOCAL_DB_PASSWORD }}
+      SALEOR_READ_ONLY_DB_PASSWORD: ${{ secrets.SALEOR_LOCAL_DB_READONLY_PASSWORD }}
 
     steps:
       - uses: actions/checkout@v3

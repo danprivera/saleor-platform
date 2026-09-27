@@ -67,18 +67,25 @@ git clone https://github.com/saleor/saleor-platform.git
 cd saleor-platform
 ```
 
-3. Apply Django migrations:
+3. Set the local database passwords. Compose refuses to start without them; nothing is committed. They live in Key Vault `rover-technologies-vault`, and `.env` is gitignored:
+```shell
+echo "SALEOR_DB_PASSWORD=$(az keyvault secret show --vault-name rover-technologies-vault -n saleor-local-db-password --query value -o tsv)" > .env
+echo "SALEOR_READ_ONLY_DB_PASSWORD=$(az keyvault secret show --vault-name rover-technologies-vault -n saleor-local-db-readonly-password --query value -o tsv)" >> .env
+```
+CI reads the same values from the repo secrets `SALEOR_LOCAL_DB_PASSWORD` / `SALEOR_LOCAL_DB_READONLY_PASSWORD`. If you rotate one in the vault, copy it to the secret: `az keyvault secret show ... --query value -o tsv | gh secret set SALEOR_LOCAL_DB_PASSWORD`. An existing `saleor-db` volume keeps its old password: `docker compose down -v` to re-initialise.
+
+4. Apply Django migrations:
 ```shell
 docker compose run --rm api python3 manage.py migrate
 ```
 
-4. Populate the database with example data and create the admin user:
+5. Populate the database with example data and create the admin user:
 ```shell
 docker compose run --rm api python3 manage.py populatedb --createsuperuser
 ```
 *Note that `--createsuperuser` argument creates an admin account for `admin@example.com` with the password set to `admin`.*
 
-5. Run the application:
+6. Run the application:
 ```shell
 docker compose up
 ```

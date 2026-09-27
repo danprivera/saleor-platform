@@ -22,6 +22,9 @@ services:
     environment:
       - DASHBOARD_URL=http://localhost:9000/
       - ALLOWED_HOSTS=localhost,127.0.0.1,api
+      # Overrides backend.env: the password comes from the environment (Key Vault
+      # `saleor-local-db-password`; the GitHub secret of the same name in CI).
+      - DATABASE_URL=postgres://saleor:${SALEOR_DB_PASSWORD:?set SALEOR_DB_PASSWORD - see README}@db/saleor
 
   dashboard:
     image: ghcr.io/saleor/saleor-dashboard:3.23
@@ -39,10 +42,15 @@ services:
       - saleor-backend-tier
     volumes:
       - saleor-db:/var/lib/postgresql/data
-      - ./replica_user.sql:/docker-entrypoint-initdb.d/replica_user.sql:ro,z
+      - ./replica_user.sh:/docker-entrypoint-initdb.d/replica_user.sh:ro,z
     environment:
-      - POSTGRES_USER=d2r_saleor
-      - POSTGRES_PASSWORD=d2r!Saleor
+      # User and database are both "saleor", matching DATABASE_URL. They were
+      # d2r_saleor with a committed password, so the api could never log in
+      # and every CI test run errored (18,079 errors, 2026-08 onward).
+      - POSTGRES_USER=saleor
+      - POSTGRES_DB=saleor
+      - POSTGRES_PASSWORD=${SALEOR_DB_PASSWORD:?set SALEOR_DB_PASSWORD - see README}
+      - SALEOR_READ_ONLY_PASSWORD=${SALEOR_READ_ONLY_DB_PASSWORD:?set SALEOR_READ_ONLY_DB_PASSWORD - see README}
 
   cache:
     image: valkey/valkey:8.1-alpine
@@ -63,6 +71,8 @@ services:
     env_file:
       - common.env
       - backend.env
+    environment:
+      - DATABASE_URL=postgres://saleor:${SALEOR_DB_PASSWORD:?set SALEOR_DB_PASSWORD - see README}@db/saleor
     depends_on:
       - cache
       - mailpit
