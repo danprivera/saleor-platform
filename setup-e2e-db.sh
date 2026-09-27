@@ -9,6 +9,11 @@ SNAPSHOT=$DIR"/update-automation-snapshot.sql"
 sed -i '' 's/update_automation_snapshot_staging_saleor_cloud/public/' $SNAPSHOT
 sed -i '' 's/update_automation_snapshot_staging_saleor_cloud/public/' $SNAPSHOT
 
+# The README keeps SALEOR_DB_PASSWORD in the gitignored .env, which compose
+# reads but this script does not: load it unless it is already exported.
+if [ -z "${SALEOR_DB_PASSWORD:-}" ] && [ -f "$DIR/.env" ]; then
+  SALEOR_DB_PASSWORD=$(sed -n 's/^SALEOR_DB_PASSWORD=//p' "$DIR/.env" | tail -n 1 | tr -d '\r')
+fi
 # The db container's password is SALEOR_DB_PASSWORD (see README), not a
 # committed one: user and database are both "saleor", as in docker-compose.yml.
 DB_URL="postgresql://saleor:${SALEOR_DB_PASSWORD:?set SALEOR_DB_PASSWORD - see README}@localhost:5432/"

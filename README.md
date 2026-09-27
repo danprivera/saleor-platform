@@ -114,7 +114,8 @@ They apply to both `api` and `worker` (the worker sends webhooks and emails). Fo
 ```shell
 ALLOWED_HOSTS=api-sndbx.rovershop.io,localhost,api
 ALLOWED_CLIENT_HOSTS=.rovershop.io
-ALLOWED_GRAPHQL_ORIGINS=https://sndbx.rovershop.io
+# Every browser origin that calls the API: the storefront and the dashboard.
+ALLOWED_GRAPHQL_ORIGINS=https://sndbx.rovershop.io,https://admin-sndbx.rovershop.io
 PUBLIC_URL=https://api-sndbx.rovershop.io
 DASHBOARD_URL=https://admin-sndbx.rovershop.io/
 DASHBOARD_API_URL=https://api-sndbx.rovershop.io/graphql/
