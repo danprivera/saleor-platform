@@ -14,9 +14,18 @@
  * not the order webhook's: these payloads carry password-reset and deletion
  * tokens.
  *
- * Attached to the "rovershop-vendor-dashboard" local app, like the order
- * webhook. Idempotent: create by name, or update the query, events and header
- * in place. Rerunning is safe.
+ * OWNED BY ITS OWN APP, "rovershop-account-emails", holding MANAGE_USERS and
+ * nothing else. Saleor dispatches an ACCOUNT_* event only to apps that hold
+ * MANAGE_USERS - and says nothing when one does not: the first registration,
+ * on "rovershop-vendor-dashboard" (orders/products/discounts), recorded zero
+ * deliveries for a real sign-up. Granting MANAGE_USERS to the dashboard app
+ * instead would hand the dashboard's token every customer record.
+ *
+ * Idempotent: creates the app if missing and ensures its permission, creates
+ * or updates the webhook in place, and removes a same-named webhook left on
+ * the dashboard app by the first version of this script. Rerunning is safe.
+ * The app's auth token is never requested or printed - nothing calls Saleor
+ * as this app; it exists to own the webhook.
  *
  * Usage:
  *   SALEOR_API_URL=https://api.rovershop.io/graphql/ \
@@ -33,7 +42,10 @@ const STRAPI_API_URL = process.env.STRAPI_API_URL ?? "https://api.roverai.io";
 const SALEOR_ACCOUNT_WEBHOOK_SECRET = requireEnv("SALEOR_ACCOUNT_WEBHOOK_SECRET");
 
 const WEBHOOK_NAME = "rovershop-account-events";
-const APP_NAME = "rovershop-vendor-dashboard";
+const APP_NAME = "rovershop-account-emails";
+const APP_PERMISSIONS = ["MANAGE_USERS"];
+/** Where the first version of this script put the webhook, without the permission to fire. */
+const PREVIOUS_APP_NAME = "rovershop-vendor-dashboard";
 const EVENTS = ["ACCOUNT_CONFIRMATION_REQUESTED", "ACCOUNT_SET_PASSWORD_REQUESTED", "ACCOUNT_DELETE_REQUESTED"];
 
 // The payload arrives as the event's own fields (no `event` wrapper - the same
@@ -100,9 +112,57 @@ async function main() {
 	assertNoErrors(auth, "tokenCreate", "Saleor auth");
 	saleorToken = auth.tokenCreate.token;
 
-	const apps = (await saleor(`{ apps(first: 20) { edges { node { id name } } } }`)).apps.edges.map((e) => e.node);
-	const app = apps.find((a) => a.name === APP_NAME);
-	if (!app) throw new Error(`App "${APP_NAME}" not found`);
+	// Every app, page by page: a name missed on page two would mean a
+	// duplicate app and a stale webhook left behind.
+	const apps = [];
+	for (let after = null; ; ) {
+		const page = (
+			await saleor(
+				`query($after: String) { apps(first: 100, after: $after) { pageInfo { hasNextPage endCursor } edges { node { id name permissions { code } } } } }`,
+				{ after },
+			)
+		).apps;
+		apps.push(...page.edges.map((e) => e.node));
+		if (!page.pageInfo.hasNextPage) break;
+		after = page.pageInfo.endCursor;
+	}
+	let app = apps.find((a) => a.name === APP_NAME);
+	if (!app) {
+		const created = await saleor(
+			`mutation($input: AppInput!) { appCreate(input: $input) { app { id name } errors { field message code } } }`,
+			{ input: { name: APP_NAME, permissions: APP_PERMISSIONS } },
+		);
+		assertNoErrors(created, "appCreate", "appCreate");
+		app = created.appCreate.app;
+		console.log(`created app ${app.id} (${APP_NAME}) with ${APP_PERMISSIONS.join(", ")}`);
+	} else {
+		// EXACTLY these permissions - set, not merged: anything extra on this
+		// app would be customer or order access nothing here needs.
+		const held = (app.permissions ?? []).map((p) => p.code).sort();
+		if (held.join() !== [...APP_PERMISSIONS].sort().join()) {
+			const updated = await saleor(
+				`mutation($id: ID!, $input: AppInput!) { appUpdate(id: $id, input: $input) { app { id } errors { field message code } } }`,
+				{ id: app.id, input: { permissions: APP_PERMISSIONS } },
+			);
+			assertNoErrors(updated, "appUpdate", "appUpdate");
+			console.log(`set ${APP_NAME} permissions to exactly ${APP_PERMISSIONS.join(", ")} (was ${held.join(", ") || "none"})`);
+		}
+	}
+
+	const previous = apps.find((a) => a.name === PREVIOUS_APP_NAME);
+	if (previous) {
+		const stale = (
+			await saleor(`query($id: ID!) { app(id: $id) { webhooks { id name } } }`, { id: previous.id })
+		).app.webhooks.filter((w) => w.name === WEBHOOK_NAME);
+		for (const hook of stale) {
+			const removed = await saleor(
+				`mutation($id: ID!) { webhookDelete(id: $id) { errors { field message code } } }`,
+				{ id: hook.id },
+			);
+			assertNoErrors(removed, "webhookDelete", "webhookDelete");
+			console.log(`removed webhook ${hook.id} from ${PREVIOUS_APP_NAME}`);
+		}
+	}
 
 	const hooks = (await saleor(`query($id: ID!) { app(id: $id) { webhooks { id name targetUrl } } }`, { id: app.id })).app.webhooks;
 	const existing = hooks.find((w) => w.name === WEBHOOK_NAME);
