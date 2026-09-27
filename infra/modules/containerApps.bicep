@@ -22,6 +22,9 @@ param dashboardImageTag string = '3.23'
 @description('Value for ALLOWED_HOSTS, e.g. api.rovershop.io')
 param allowedHosts string
 
+@description('Value for ALLOWED_CLIENT_HOSTS: hosts Saleor accepts in a redirectUrl (account confirm / reset links). Separate from ALLOWED_HOSTS, which gates the inbound Host header. A leading dot allows every subdomain.')
+param allowedClientHosts string = allowedHosts
+
 @description('Value for ALLOWED_GRAPHQL_ORIGINS')
 param allowedGraphqlOrigins string = '*'
 
@@ -80,7 +83,7 @@ var commonSecrets = [
 
 var commonEnv = [
   { name: 'DEBUG', value: 'False' }
-  { name: 'ALLOWED_CLIENT_HOSTS', value: allowedHosts }
+  { name: 'ALLOWED_CLIENT_HOSTS', value: allowedClientHosts }
   { name: 'SECRET_KEY', secretRef: 'secret-key' }
   { name: 'RSA_PRIVATE_KEY', secretRef: 'rsa-private-key' }
   { name: 'DATABASE_URL', secretRef: 'database-url' }

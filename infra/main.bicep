@@ -31,6 +31,9 @@ param dashboardImageTag string = '3.23'
 @description('Value for ALLOWED_HOSTS, e.g. api.rovershop.io')
 param allowedHosts string
 
+@description('Value for ALLOWED_CLIENT_HOSTS: hosts Saleor accepts in a redirectUrl (account confirm / reset links). Separate from ALLOWED_HOSTS, which gates the inbound Host header. A leading dot allows every subdomain.')
+param allowedClientHosts string = allowedHosts
+
 @description('Value for ALLOWED_GRAPHQL_ORIGINS')
 param allowedGraphqlOrigins string = '*'
 
@@ -150,6 +153,7 @@ module containerApps 'modules/containerApps.bicep' = {
     apiImageTag: apiImageTag
     dashboardImageTag: dashboardImageTag
     allowedHosts: allowedHosts
+    allowedClientHosts: allowedClientHosts
     allowedGraphqlOrigins: allowedGraphqlOrigins
     publicUrl: publicUrl
     dashboardUrl: dashboardUrl
