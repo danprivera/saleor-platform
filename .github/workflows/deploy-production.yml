@@ -6,7 +6,8 @@ on:
       api_image_tag:
         description: "Image tag for ghcr.io/saleor/saleor"
         required: false
-        default: "3.23"
+        # An exact patch: a floating "3.23" upgraded prod without its migration (2026-09-27).
+        default: "3.23.36"
       dashboard_image_tag:
         description: "Image tag for ghcr.io/saleor/saleor-dashboard"
         required: false
