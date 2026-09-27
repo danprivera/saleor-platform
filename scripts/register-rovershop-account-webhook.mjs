@@ -112,9 +112,20 @@ async function main() {
 	assertNoErrors(auth, "tokenCreate", "Saleor auth");
 	saleorToken = auth.tokenCreate.token;
 
-	const apps = (
-		await saleor(`{ apps(first: 50) { edges { node { id name permissions { code } } } } }`)
-	).apps.edges.map((e) => e.node);
+	// Every app, page by page: a name missed on page two would mean a
+	// duplicate app and a stale webhook left behind.
+	const apps = [];
+	for (let after = null; ; ) {
+		const page = (
+			await saleor(
+				`query($after: String) { apps(first: 100, after: $after) { pageInfo { hasNextPage endCursor } edges { node { id name permissions { code } } } } }`,
+				{ after },
+			)
+		).apps;
+		apps.push(...page.edges.map((e) => e.node));
+		if (!page.pageInfo.hasNextPage) break;
+		after = page.pageInfo.endCursor;
+	}
 	let app = apps.find((a) => a.name === APP_NAME);
 	if (!app) {
 		const created = await saleor(
@@ -125,14 +136,16 @@ async function main() {
 		app = created.appCreate.app;
 		console.log(`created app ${app.id} (${APP_NAME}) with ${APP_PERMISSIONS.join(", ")}`);
 	} else {
-		const held = (app.permissions ?? []).map((p) => p.code);
-		if (APP_PERMISSIONS.some((code) => !held.includes(code))) {
+		// EXACTLY these permissions - set, not merged: anything extra on this
+		// app would be customer or order access nothing here needs.
+		const held = (app.permissions ?? []).map((p) => p.code).sort();
+		if (held.join() !== [...APP_PERMISSIONS].sort().join()) {
 			const updated = await saleor(
 				`mutation($id: ID!, $input: AppInput!) { appUpdate(id: $id, input: $input) { app { id } errors { field message code } } }`,
-				{ id: app.id, input: { permissions: [...new Set([...held, ...APP_PERMISSIONS])] } },
+				{ id: app.id, input: { permissions: APP_PERMISSIONS } },
 			);
 			assertNoErrors(updated, "appUpdate", "appUpdate");
-			console.log(`granted ${APP_PERMISSIONS.join(", ")} to ${APP_NAME}`);
+			console.log(`set ${APP_NAME} permissions to exactly ${APP_PERMISSIONS.join(", ")} (was ${held.join(", ") || "none"})`);
 		}
 	}
 
