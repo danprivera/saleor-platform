@@ -96,6 +96,35 @@ docker compose up
 - Jaeger UI (APM) - http://localhost:16686
 - Mailpit (Test email interface) - http://localhost:8025
 
+## Running as sndbx / dev (non-prod overrides)
+
+The settings that differ per environment are read from the shell or the gitignored `.env` (the same file as the database passwords) and default to the local values, so plain `docker compose up` is unchanged and no committed file needs editing:
+
+| Variable | Local default | Used for |
+|---|---|---|
+| `ALLOWED_HOSTS` | `localhost,127.0.0.1,api` | Host headers the API answers |
+| `ALLOWED_CLIENT_HOSTS` | `localhost,127.0.0.1` | Hosts allowed in client redirect URLs (account emails) |
+| `ALLOWED_GRAPHQL_ORIGINS` | `*` | CORS origins for `/graphql/` |
+| `PUBLIC_URL` | unset (URLs built from the request host) | Absolute URLs in emails and webhook payloads |
+| `DASHBOARD_URL` | `http://localhost:9000/` | Dashboard links Saleor generates |
+| `DASHBOARD_API_URL` | `http://localhost:8000/graphql/` | The dashboard service's `API_URL` |
+| `HTTP_IP_FILTER_ENABLED` | `True` | Saleor's outbound-request IP filter |
+
+They apply to both `api` and `worker` (the worker sends webhooks and emails). For example, a sndbx stack behind `api-sndbx.rovershop.io` would add to `.env`:
+```shell
+ALLOWED_HOSTS=api-sndbx.rovershop.io,localhost,api
+ALLOWED_CLIENT_HOSTS=.rovershop.io
+ALLOWED_GRAPHQL_ORIGINS=https://sndbx.rovershop.io
+PUBLIC_URL=https://api-sndbx.rovershop.io
+DASHBOARD_URL=https://admin-sndbx.rovershop.io/
+DASHBOARD_API_URL=https://api-sndbx.rovershop.io/graphql/
+# Webhooks to Strapi running in Docker go to a private IP, which the filter blocks.
+HTTP_IP_FILTER_ENABLED=False
+```
+Check what compose will use with `docker compose config`. `HTTP_IP_FILTER_ENABLED=False` is for non-prod only; production keeps the filter on. Production is configured separately (`infra/`, see `DEPLOYMENT.md`), not from these files.
+
+The scripts in `scripts/` have no default target: `SALEOR_API_URL` (and `STRAPI_API_URL` where used) must be set explicitly, e.g. `SALEOR_API_URL=http://localhost:8000/graphql/`, so a run meant for local or sndbx can never reach production by accident.
+
 # Troubleshooting
 
 - [How to solve issues with lack of available space or build errors after an update](#how-to-solve-issues-with-lack-of-available-space-or-build-errors-after-an-update)
