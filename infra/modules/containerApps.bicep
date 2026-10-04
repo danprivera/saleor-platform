@@ -103,6 +103,8 @@ var commonEnv = [
   { name: 'HTTP_IP_FILTER_ENABLED', value: 'True' }
   { name: 'HTTP_IP_FILTER_ALLOW_LOOPBACK_IPS', value: 'False' }
   { name: 'AZURE_CONTAINER', value: 'media' }
+  // Shared private storage so the worker can read payload files the API wrote (see storage.bicep).
+  { name: 'AZURE_CONTAINER_PRIVATE', value: 'private' }
   { name: 'AZURE_ACCOUNT_NAME', value: storageAccountName }
   { name: 'AZURE_ACCOUNT_KEY', secretRef: 'storage-account-key' }
   // Storage account rejects plain HTTP (AccountRequiresHttps) — Saleor defaults to HTTP without this

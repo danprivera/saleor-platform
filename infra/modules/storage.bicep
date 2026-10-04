@@ -7,6 +7,9 @@ param location string
 @description('Blob container name used for Saleor media uploads.')
 param mediaContainerName string = 'media'
 
+@description('Private blob container for Saleor PRIVATE_FILE_STORAGE (webhook payload files, invoices).')
+param privateContainerName string = 'private'
+
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   name: name
   location: location
@@ -33,6 +36,19 @@ resource mediaContainer 'Microsoft.Storage/storageAccounts/blobServices/containe
   name: mediaContainerName
   properties: {
     publicAccess: 'Blob'
+  }
+}
+
+// Saleor's PRIVATE_FILE_STORAGE. Unset, it defaults to the API container's
+// local disk: saleor-api writes each webhook payload there and saleor-worker,
+// a different container, cannot read it - every non-deferred async webhook
+// (FULFILLMENT_CREATED, ...) failed with FileNotFoundError (dashboard#416).
+// No public access: payloads carry customer data.
+resource privateContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-01-01' = {
+  parent: blobService
+  name: privateContainerName
+  properties: {
+    publicAccess: 'None'
   }
 }
 
