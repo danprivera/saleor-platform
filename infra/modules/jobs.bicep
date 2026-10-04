@@ -46,6 +46,8 @@ var commonEnv = [
   { name: 'SECRET_KEY', secretRef: 'secret-key' }
   { name: 'DATABASE_URL', secretRef: 'database-url' }
   { name: 'AZURE_CONTAINER', value: 'media' }
+  // Shared private storage so the worker can read payload files the API wrote (see storage.bicep).
+  { name: 'AZURE_CONTAINER_PRIVATE', value: 'private' }
   { name: 'AZURE_ACCOUNT_NAME', value: storageAccountName }
   { name: 'AZURE_ACCOUNT_KEY', secretRef: 'storage-account-key' }
   // Storage account rejects plain HTTP (AccountRequiresHttps) — Saleor defaults to HTTP without this
