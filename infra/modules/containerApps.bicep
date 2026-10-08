@@ -21,7 +21,11 @@ param storageAccountName string
 param apiImageTag string = '3.23.36'
 
 @description('Image tag for ghcr.io/saleor/saleor-dashboard.')
-param dashboardImageTag string = '3.23'
+// Also an EXACT patch. The dashboard is static files behind nginx with up to
+// two replicas; when one replica was replaced on 2026-10-08 it pulled a newer
+// 3.23 build, and every admin page crashed because each replica answered the
+// other's hashed chunks with index.html.
+param dashboardImageTag string = '3.23.39'
 
 @description('Value for ALLOWED_HOSTS, e.g. api.rovershop.io')
 param allowedHosts string

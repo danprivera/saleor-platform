@@ -44,7 +44,7 @@ services:
     environment: *saleor-env
 
   dashboard:
-    image: ghcr.io/saleor/saleor-dashboard:3.23
+    image: ghcr.io/saleor/saleor-dashboard:3.23.39
     ports:
       - 9000:80
     restart: unless-stopped
