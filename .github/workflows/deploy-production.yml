@@ -11,7 +11,10 @@ on:
       dashboard_image_tag:
         description: "Image tag for ghcr.io/saleor/saleor-dashboard"
         required: false
-        default: "3.23"
+        # An exact patch too: on a floating "3.23" the two replicas ended up on
+        # different builds when one was replaced (2026-10-08), and every admin
+        # page crashed loading chunks the other replica did not have.
+        default: "3.23.39"
       run_migrations:
         # Defaults to TRUE deliberately. It used to default to false, and that
         # is how the 3.23 image ran against a pre-3.23 schema for ten days:
