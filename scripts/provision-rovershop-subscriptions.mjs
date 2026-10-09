@@ -208,9 +208,13 @@ async function main() {
 
 	// --- 2. Product type (check-before-create by name) ---
 	console.log(`Ensuring product type "Subscription Plan" exists...`);
-	let productType = (await saleor(`{ productTypes(first: 50) { edges { node { id name } } } }`))
-		.productTypes.edges.map((e) => e.node)
-		.find((pt) => pt.name === "Subscription Plan");
+	const productTypes = (await saleor(`{ productTypes(first: 100) { edges { node { id name metadata { key value } } } } }`)).productTypes.edges.map((e) => e.node);
+	// The shared kind for "subscription" first (rovershop-dashboard-web#484): products moved
+	// onto it must not be re-seeded onto the legacy type. "Subscription Plan" stays the
+	// fallback for an environment without the kinds.
+	let productType =
+		productTypes.find((t) => t.metadata?.some((m) => m.key === "roverType" && m.value === "subscription")) ??
+		productTypes.find((t) => t.name === "Subscription Plan");
 
 	if (!productType) {
 		const created = await saleor(
@@ -254,7 +258,10 @@ async function main() {
 	const allProductsResult = await saleor(
 		`{ products(first: 100, filter: {}) { edges { node { id name metadata { key value } defaultVariant { id } variants { id } } } } }`,
 	);
-	const existingProducts = allProductsResult.products.edges.map((e) => e.node);
+	const existingProducts = (allProductsResult.products.edges.map((e) => e.node))
+		// A row moved onto a shared kind keeps its markers but is retired; its replacement
+		// (marked roverMigratedTo on the old row) is the product now (rovershop-dashboard-web#484).
+		.filter((p) => !(p.metadata ?? []).some((m) => m.key === "roverMigratedTo"));
 
 	const productIds = [];
 

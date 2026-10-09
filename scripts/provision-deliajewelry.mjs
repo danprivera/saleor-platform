@@ -163,7 +163,10 @@ async function provisionProducts({ products, productType, category, channel, met
 	const allProductsResult = await saleor(
 		`{ products(first: 100, filter: {}) { edges { node { id name metadata { key value } defaultVariant { id } variants { id } } } } }`,
 	);
-	const existingProducts = allProductsResult.products.edges.map((e) => e.node);
+	const existingProducts = (allProductsResult.products.edges.map((e) => e.node))
+		// A row moved onto a shared kind keeps its markers but is retired; its replacement
+		// (marked roverMigratedTo on the old row) is the product now (rovershop-dashboard-web#484).
+		.filter((p) => !(p.metadata ?? []).some((m) => m.key === "roverMigratedTo"));
 
 	const productIds = [];
 
@@ -364,9 +367,13 @@ async function main() {
 	}
 
 	// --- Resolve Default Type product type (must already exist) ---
-	const productType = (await saleor(`{ productTypes(first: 50) { edges { node { id name } } } }`))
-		.productTypes.edges.map((e) => e.node)
-		.find((pt) => pt.name === "Default Type");
+	const productTypes = (await saleor(`{ productTypes(first: 100) { edges { node { id name metadata { key value } } } } }`)).productTypes.edges.map((e) => e.node);
+	// The shared kind for "physical" first (rovershop-dashboard-web#484): products moved
+	// onto it must not be re-seeded onto the legacy type. "Default Type" stays the
+	// fallback for an environment without the kinds.
+	const productType =
+		productTypes.find((t) => t.metadata?.some((m) => m.key === "roverType" && m.value === "physical")) ??
+		productTypes.find((t) => t.name === "Default Type");
 	if (!productType) {
 		throw new Error('"Default Type" product type not found — expected it to already exist');
 	}
