@@ -66,6 +66,28 @@ async function saleor(query, variables = {}) {
 	return json.data;
 }
 
+/**
+ * Every node of a connection, page by page (review on saleor-platform#11): a
+ * lookup that decides "does this already exist" or "which type" must not stop
+ * at the first 100. Throws at the cap rather than deciding on part of the list.
+ */
+async function allNodes(field, selection) {
+	const nodes = [];
+	let after = null;
+	for (let page = 0; page < 50; page++) {
+		const data = await saleor(
+			`query($after: String) { ${field}(first: 100, after: $after) { pageInfo { hasNextPage endCursor } edges { node { ${selection} } } } }`,
+			{ after },
+		);
+		const connection = data?.[field];
+		if (!connection || !Array.isArray(connection.edges)) throw new Error(`${field}: unreadable response`);
+		nodes.push(...connection.edges.map((e) => e.node));
+		if (!connection.pageInfo.hasNextPage) return nodes;
+		after = connection.pageInfo.endCursor;
+	}
+	throw new Error(`${field}: more than 50 pages; refusing to decide on a partial list`);
+}
+
 function assertNoErrors(result, mutationKey, label) {
 	const errors = result?.[mutationKey]?.errors;
 	if (errors && errors.length > 0) throw new Error(`${label} failed: ${JSON.stringify(errors)}`);
@@ -94,9 +116,13 @@ async function main() {
 
 	// --- 2. Product type (non-shippable, no variants) ---
 	console.log(`Ensuring product type "Bytes Top-Up" exists...`);
-	let productType = (await saleor(`{ productTypes(first: 100) { edges { node { id name } } } }`)).productTypes.edges
-		.map((e) => e.node)
-		.find((pt) => pt.name === "Bytes Top-Up");
+	const productTypes = await allNodes("productTypes", "id name metadata { key value }");
+	// The shared kind for "entitlement" first (rovershop-dashboard-web#484): products moved
+	// onto it must not be re-seeded onto the legacy type. "Bytes Top-Up" stays the
+	// fallback for an environment without the kinds.
+	let productType =
+		productTypes.find((t) => t.metadata?.some((m) => m.key === "roverType" && m.value === "entitlement")) ??
+		productTypes.find((t) => t.name === "Bytes Top-Up");
 	if (!productType) {
 		const created = await saleor(
 			`mutation($input: ProductTypeInput!) { productTypeCreate(input: $input) { productType { id name } errors { field message } } }`,
@@ -128,9 +154,10 @@ async function main() {
 
 	// --- 4. Products (idempotent by roverstoreBytes metadata) ---
 	console.log("Fetching existing products for idempotency check...");
-	const existingProducts = (
-		await saleor(`{ products(first: 100, filter: {}) { edges { node { id name metadata { key value } defaultVariant { id } variants { id } } } } }`)
-	).products.edges.map((e) => e.node);
+	const existingProducts = (await allNodes("products", "id name metadata { key value } defaultVariant { id } variants { id }"))
+		// A row moved onto a shared kind keeps its markers but is retired; its replacement
+		// (marked roverMigratedTo on the old row) is the product now (rovershop-dashboard-web#484).
+		.filter((p) => !(p.metadata ?? []).some((m) => m.key === "roverMigratedTo"));
 
 	const productIds = [];
 	for (const item of PACKAGES) {
