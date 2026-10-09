@@ -137,6 +137,28 @@ async function saleor(query, variables = {}) {
 	return json.data;
 }
 
+/**
+ * Every node of a connection, page by page (review on saleor-platform#11): a
+ * lookup that decides "does this already exist" or "which type" must not stop
+ * at the first 100. Throws at the cap rather than deciding on part of the list.
+ */
+async function allNodes(field, selection) {
+	const nodes = [];
+	let after = null;
+	for (let page = 0; page < 50; page++) {
+		const data = await saleor(
+			`query($after: String) { ${field}(first: 100, after: $after) { pageInfo { hasNextPage endCursor } edges { node { ${selection} } } } }`,
+			{ after },
+		);
+		const connection = data?.[field];
+		if (!connection || !Array.isArray(connection.edges)) throw new Error(`${field}: unreadable response`);
+		nodes.push(...connection.edges.map((e) => e.node));
+		if (!connection.pageInfo.hasNextPage) return nodes;
+		after = connection.pageInfo.endCursor;
+	}
+	throw new Error(`${field}: more than 50 pages; refusing to decide on a partial list`);
+}
+
 function assertNoErrors(result, mutationKey, label) {
 	const errors = result?.[mutationKey]?.errors;
 	if (errors && errors.length > 0) {
@@ -160,10 +182,7 @@ function plaintextToEditorJs(text) {
  */
 async function provisionProducts({ products, productType, category, channel, metadataKey }) {
 	console.log(`Fetching existing Saleor products for idempotency check (key=${metadataKey})...`);
-	const allProductsResult = await saleor(
-		`{ products(first: 100, filter: {}) { edges { node { id name metadata { key value } defaultVariant { id } variants { id } } } } }`,
-	);
-	const existingProducts = (allProductsResult.products.edges.map((e) => e.node))
+	const existingProducts = (await allNodes("products", "id name metadata { key value } defaultVariant { id } variants { id }"))
 		// A row moved onto a shared kind keeps its markers but is retired; its replacement
 		// (marked roverMigratedTo on the old row) is the product now (rovershop-dashboard-web#484).
 		.filter((p) => !(p.metadata ?? []).some((m) => m.key === "roverMigratedTo"));
@@ -367,7 +386,7 @@ async function main() {
 	}
 
 	// --- Resolve Default Type product type (must already exist) ---
-	const productTypes = (await saleor(`{ productTypes(first: 100) { edges { node { id name metadata { key value } } } } }`)).productTypes.edges.map((e) => e.node);
+	const productTypes = await allNodes("productTypes", "id name metadata { key value }");
 	// The shared kind for "physical" first (rovershop-dashboard-web#484): products moved
 	// onto it must not be re-seeded onto the legacy type. "Default Type" stays the
 	// fallback for an environment without the kinds.
