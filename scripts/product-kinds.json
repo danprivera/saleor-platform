@@ -1,0 +1,15 @@
+{
+	"$comment": "The shared product kinds (rovershop-dashboard-web#479). One Saleor product type per behaviour, shared by every store; the type's metadata `roverType` names the behaviour the storefront derives everything from. `roverType` values must match the storefront's ROVER_TYPES and `isShippingRequired` the dashboard's BEHAVIOURS `shipped` - rovershop-dashboard-web/src/lib/products/kinds-parity.test.ts reads this file and fails on drift. Provisioned by provision-product-kinds.mjs.",
+	"kinds": [
+		{ "roverType": "physical", "slug": "rover-retail", "name": "Retail product", "isShippingRequired": true, "isDigital": false, "hasVariants": true, "kind": "NORMAL" },
+		{ "roverType": "digital", "slug": "rover-digital", "name": "Digital product", "isShippingRequired": false, "isDigital": true, "hasVariants": false, "kind": "NORMAL" },
+		{ "roverType": "subscription", "slug": "rover-subscription", "name": "Subscription", "isShippingRequired": false, "isDigital": false, "hasVariants": false, "kind": "NORMAL" },
+		{ "roverType": "addon", "slug": "rover-addon", "name": "Plan add-on", "isShippingRequired": false, "isDigital": false, "hasVariants": false, "kind": "NORMAL" },
+		{ "roverType": "entitlement", "slug": "rover-credits", "name": "Credits / top-up", "isShippingRequired": false, "isDigital": true, "hasVariants": false, "kind": "NORMAL" },
+		{ "roverType": "service", "slug": "rover-appointment", "name": "Appointment", "isShippingRequired": false, "isDigital": false, "hasVariants": true, "kind": "NORMAL" },
+		{ "roverType": "rental", "slug": "rover-rental", "name": "Rental", "isShippingRequired": false, "isDigital": false, "hasVariants": true, "kind": "NORMAL" },
+		{ "roverType": "event", "slug": "rover-event", "name": "Class / event", "isShippingRequired": false, "isDigital": false, "hasVariants": true, "kind": "NORMAL" },
+		{ "roverType": "bundle", "slug": "rover-bundle", "name": "Bundle", "isShippingRequired": true, "isDigital": false, "hasVariants": true, "kind": "NORMAL" },
+		{ "roverType": "giftcard", "slug": "rover-gift-card", "name": "Gift card", "isShippingRequired": false, "isDigital": true, "hasVariants": true, "kind": "GIFT_CARD" }
+	]
+}
