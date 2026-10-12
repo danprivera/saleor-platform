@@ -49,6 +49,10 @@ const SUBSCRIPTION_QUERY = `subscription {
 			order {
 				id
 				number
+				# When the order was placed. Campaign attribution (rovershop-dashboard-web#594)
+				# measures its 14-day window to this, not to when a possibly delayed
+				# delivery arrives (rover-strapi#270).
+				created
 				channel { slug }
 				userEmail
 				total { gross { amount currency } }
