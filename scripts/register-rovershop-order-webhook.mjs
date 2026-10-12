@@ -73,7 +73,9 @@ const SUBSCRIPTION_QUERY = `subscription {
 					variant {
 						id
 						sku
-						product { metadata { key value } }
+						# slug: campaign analytics count units per PRODUCT, not per variant SKU
+						# (rover-strapi#270).
+						product { slug metadata { key value } }
 					}
 				}
 			}
