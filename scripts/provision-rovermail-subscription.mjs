@@ -53,7 +53,7 @@ const COMMON_FEATURES = [
  * Bump when the images change: a product whose `roverImagesVersion` differs gets its media
  * replaced (the old ones are deleted first), so a re-run never stacks duplicates.
  */
-const IMAGES_VERSION = "2";
+const IMAGES_VERSION = "3";
 
 /**
  * Pro storage: the owner asked for 25 GB, but the rovermail.ai domain's OpenSRS quota_maximum is
@@ -70,9 +70,10 @@ export const PLANS = [
 		sku: "rovermail-pro-monthly",
 		price: "2.50",
 		storageMb: "20480",
-		availableForPurchase: true,
+		// Billed by Stripe subscriptions (Checkout from the Rovermail plan picker): catalogue entry only.
+		availableForPurchase: false,
 		summary:
-			"Rovermail Pro: your AI powered email, calendar, and notes at your-name@rovermail.ai, with 20 GB of storage, for $2.50 a month. A standalone plan; it does not include RoverShop store features.",
+			"Rovermail Pro: your AI powered email, calendar, and notes at your-name@rovermail.ai, with 20 GB of storage, for $2.50 a month. Subscribe at https://mail.rovermail.ai/ with your Rover account; included with RoverChat Pro. A standalone plan; it does not include RoverShop store features.",
 		features: ["20 GB of storage", ...COMMON_FEATURES],
 		images: [
 			["rovermail-pro-1-hero.png", "Rovermail Pro: 20 GB storage, $2.50 a month"],
@@ -80,23 +81,23 @@ export const PLANS = [
 		],
 	},
 	{
-		tier: "rovermail-free",
-		formerTiers: [],
-		formerSlugs: [],
-		slug: "rovermail-free",
-		name: "Rovermail Free",
-		sku: "rovermail-free",
-		price: "0.00",
+		tier: "rovermail-basic",
+		// The former free tier: updated in place, never left as a stray product.
+		formerTiers: ["rovermail-free"],
+		formerSlugs: ["rovermail-free"],
+		slug: "rovermail-basic",
+		name: "Rovermail Basic",
+		sku: "rovermail-basic-monthly",
+		price: "0.99",
 		storageMb: "1024",
-		// Free is a signed-in signup at mail.rovermail.ai (one per Rover account), never a checkout:
-		// listed so it can be shown and compared, but not purchasable.
+		// Billed by Stripe subscriptions (Checkout from the Rovermail plan picker): catalogue entry only.
 		availableForPurchase: false,
 		summary:
-			"Rovermail Free: your AI powered email, calendar, and notes at your-name@rovermail.ai, with 1 GB of storage. No card needed: get started at https://mail.rovermail.ai/ with your Rover account.",
+			"Rovermail Basic: your AI powered email, calendar, and notes at your-name@rovermail.ai, with 1 GB of storage, for $0.99 a month. Subscribe at https://mail.rovermail.ai/ with your Rover account.",
 		features: ["1 GB of storage", ...COMMON_FEATURES],
 		images: [
-			["rovermail-free-1-hero.png", "Rovermail Free: 1 GB storage, no card needed"],
-			["rovermail-free-2-features.png", "Rovermail Free features: 1 GB storage, email, calendar, notes, Rover Vault, Rover Assistant, iPhone app"],
+			["rovermail-basic-1-hero.png", "Rovermail Basic: 1 GB storage, $0.99 a month"],
+			["rovermail-basic-2-features.png", "Rovermail Basic features: 1 GB storage, email, calendar, notes, Rover Vault, Rover Assistant, iPhone app"],
 		],
 	},
 ].map((p) => ({
@@ -108,6 +109,7 @@ export const PLANS = [
 		{ key: "roverBillingInterval", value: "monthly" },
 		{ key: "roverMailStorageMb", value: p.storageMb },
 		{ key: "roverImagesVersion", value: IMAGES_VERSION },
+		{ key: "roverCheckout", value: "stripe" },
 		...(p.availableForPurchase ? [] : [{ key: "roverSignupUrl", value: "https://mail.rovermail.ai/?_task=login&_action=plans" }]),
 	],
 }));
