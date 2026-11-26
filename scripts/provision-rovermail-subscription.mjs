@@ -40,34 +40,77 @@ const SALEOR_ADMIN_PASSWORD = SALEOR_TOKEN ? "" : requireEnv("SALEOR_ADMIN_PASSW
 const CHANNEL_SLUG = process.env.ROVERSHOP_PLANS_CHANNEL || "rovershop";
 const TIER_KEY = "roverstoreSubscriptionTier";
 
-export const ROVERMAIL = {
-	tier: "rovermail",
-	slug: "rovermail",
-	name: "Rovermail",
-	sku: "rovermail-monthly",
-	price: "2.00",
+const COMMON_FEATURES = [
+	"AI-powered email at your-name@rovermail.ai",
+	"Calendar with invites and reminders",
+	"Notes, synced with Apple Notes",
+	"Rover Vault for your private files",
+	"The Rover Assistant for drafts, summaries and triage",
+	"The Rovermail iPhone app",
+];
+
+/**
+ * Bump when the images change: a product whose `roverImagesVersion` differs gets its media
+ * replaced (the old ones are deleted first), so a re-run never stacks duplicates.
+ */
+const IMAGES_VERSION = "2";
+
+/**
+ * Pro storage: the owner asked for 25 GB, but the rovermail.ai domain's OpenSRS quota_maximum is
+ * 20480 MB and the provider refuses more (checked 2026-11-25). The copy says what buyers get.
+ */
+export const PLANS = [
+	{
+		tier: "rovermail-pro",
+		// The single $2 plan this replaces: updated in place, never left as a stray product.
+		formerTiers: ["rovermail"],
+		formerSlugs: ["rovermail"],
+		slug: "rovermail-pro",
+		name: "Rovermail Pro",
+		sku: "rovermail-pro-monthly",
+		price: "2.50",
+		storageMb: "20480",
+		availableForPurchase: true,
+		summary:
+			"Rovermail Pro: your AI powered email, calendar, and notes at your-name@rovermail.ai, with 20 GB of storage, for $2.50 a month. A standalone plan; it does not include RoverShop store features.",
+		features: ["20 GB of storage", ...COMMON_FEATURES],
+		images: [
+			["rovermail-pro-1-hero.png", "Rovermail Pro: 20 GB storage, $2.50 a month"],
+			["rovermail-pro-2-features.png", "Rovermail Pro features: 20 GB storage, email, calendar, notes, Rover Vault, Rover Assistant, iPhone app"],
+		],
+	},
+	{
+		tier: "rovermail-free",
+		formerTiers: [],
+		formerSlugs: [],
+		slug: "rovermail-free",
+		name: "Rovermail Free",
+		sku: "rovermail-free",
+		price: "0.00",
+		storageMb: "1024",
+		// Free is a signed-in signup at mail.rovermail.ai (one per Rover account), never a checkout:
+		// listed so it can be shown and compared, but not purchasable.
+		availableForPurchase: false,
+		summary:
+			"Rovermail Free: your AI powered email, calendar, and notes at your-name@rovermail.ai, with 1 GB of storage. No card needed: get started at https://mail.rovermail.ai/ with your Rover account.",
+		features: ["1 GB of storage", ...COMMON_FEATURES],
+		images: [
+			["rovermail-free-1-hero.png", "Rovermail Free: 1 GB storage, no card needed"],
+			["rovermail-free-2-features.png", "Rovermail Free features: 1 GB storage, email, calendar, notes, Rover Vault, Rover Assistant, iPhone app"],
+		],
+	},
+].map((p) => ({
+	...p,
 	metadata: [
 		{ key: "roverType", value: "subscription" },
-		{ key: TIER_KEY, value: "rovermail" },
+		{ key: TIER_KEY, value: p.tier },
 		{ key: "roverstoreProduct", value: "mail" },
 		{ key: "roverBillingInterval", value: "monthly" },
+		{ key: "roverMailStorageMb", value: p.storageMb },
+		{ key: "roverImagesVersion", value: IMAGES_VERSION },
+		...(p.availableForPurchase ? [] : [{ key: "roverSignupUrl", value: "https://mail.rovermail.ai/?_task=login&_action=plans" }]),
 	],
-	summary:
-		"Your AI powered email, calendar, and notes: your own address at your-name@rovermail.ai, for $2 a month. Rovermail is a standalone plan and does not include RoverShop store features.",
-	features: [
-		"AI-powered email at your-name@rovermail.ai",
-		"Calendar with invites and reminders",
-		"Notes, synced with Apple Notes",
-		"Rover Vault for your private files",
-		"The Rover Assistant for drafts, summaries and triage",
-		"The Rovermail iPhone app",
-	],
-	images: [
-		["rovermail-product-1-icon.png", "Rovermail app icon"],
-		["rovermail-product-2-wordmark.png", "Rovermail: your AI powered email, calendar, and notes"],
-		["rovermail-product-3-features.png", "Rovermail features: email, calendar, notes, Rover Vault, Rover Assistant, iPhone app"],
-	],
-};
+}));
 
 const ASSET_DIR = join(dirname(fileURLToPath(import.meta.url)), "assets", "rovermail");
 
@@ -101,7 +144,7 @@ function assertNoErrors(result, key, label) {
 }
 
 /** Paragraph = summary, list = features: the shape the plan cards read (dashboard plan-catalogue.ts). */
-export function description(item = ROVERMAIL) {
+export function description(item) {
 	return JSON.stringify({
 		time: 0,
 		blocks: [
@@ -152,7 +195,6 @@ async function uploadMedia(productId, file, alt) {
 }
 
 async function main() {
-	const item = ROVERMAIL;
 	if (SALEOR_TOKEN) {
 		saleorToken = SALEOR_TOKEN;
 	} else {
@@ -177,60 +219,72 @@ async function main() {
 	const category = (await allNodes("categories", "id name")).find((c) => c.name === "Plans");
 	if (!category) throw new Error('no "Plans" category; run provision-rovershop-subscriptions.mjs first');
 
-	const products = (await allNodes("products", "id slug metadata { key value } variants { id } media { id }")).filter(
-		(p) => !(p.metadata ?? []).some((m) => m.key === "roverMigratedTo"),
-	);
-	let product =
-		products.find((p) => p.metadata.some((m) => m.key === TIER_KEY && m.value === item.tier)) ??
-		products.find((p) => p.slug === item.slug);
 
-	const input = { name: item.name, slug: item.slug, category: category.id, description: description(item), metadata: item.metadata };
-	if (!product) {
-		const created = await saleor(
-			`mutation($input: ProductCreateInput!) { productCreate(input: $input) { product { id slug variants { id } media { id } } errors { field message } } }`,
-			{ input: { ...input, productType: productType.id } },
+	for (const item of PLANS) {
+		console.log(`== ${item.name}`);
+		const products = (await allNodes("products", "id slug metadata { key value } variants { id } media { id }")).filter(
+			(p) => !(p.metadata ?? []).some((m) => m.key === "roverMigratedTo"),
 		);
-		assertNoErrors(created, "productCreate", "productCreate");
-		product = created.productCreate.product;
-		console.log(`created product ${product.id}`);
-	} else {
-		const updated = await saleor(
-			`mutation($id: ID!, $input: ProductInput!) { productUpdate(id: $id, input: $input) { product { id } errors { field message } } }`,
-			{ id: product.id, input },
+		const tiers = [item.tier, ...item.formerTiers];
+		const slugs = [item.slug, ...item.formerSlugs];
+		let product =
+			products.find((p) => p.metadata.some((m) => m.key === TIER_KEY && tiers.includes(m.value))) ??
+			products.find((p) => slugs.includes(p.slug));
+
+		const input = { name: item.name, slug: item.slug, category: category.id, description: description(item), metadata: item.metadata };
+		if (!product) {
+			const created = await saleor(
+				`mutation($input: ProductCreateInput!) { productCreate(input: $input) { product { id slug variants { id } media { id } } errors { field message } } }`,
+				{ input: { ...input, productType: productType.id } },
+			);
+			assertNoErrors(created, "productCreate", "productCreate");
+			product = created.productCreate.product;
+			console.log(`created product ${product.id}`);
+		} else {
+			const updated = await saleor(
+				`mutation($id: ID!, $input: ProductInput!) { productUpdate(id: $id, input: $input) { product { id } errors { field message } } }`,
+				{ id: product.id, input },
+			);
+			assertNoErrors(updated, "productUpdate", "productUpdate");
+			console.log(`product exists, updated: ${product.id}`);
+		}
+
+		let variantId = product.variants?.[0]?.id;
+		if (!variantId) {
+			const v = await saleor(
+				`mutation($input: ProductVariantCreateInput!) { productVariantCreate(input: $input) { productVariant { id } errors { field message } } }`,
+				{ input: { product: product.id, sku: item.sku, name: item.availableForPurchase ? "Monthly" : "Free", trackInventory: false, attributes: [] } },
+			);
+			assertNoErrors(v, "productVariantCreate", "productVariantCreate");
+			variantId = v.productVariantCreate.productVariant.id;
+			console.log(`created variant ${variantId}`);
+		}
+
+		const listed = await saleor(
+			`mutation($id: ID!, $input: ProductChannelListingUpdateInput!) { productChannelListingUpdate(id: $id, input: $input) { product { id } errors { field message } } }`,
+			{ id: product.id, input: { updateChannels: [{ channelId: channel.id, isPublished: true, visibleInListings: true, isAvailableForPurchase: item.availableForPurchase }] } },
 		);
-		assertNoErrors(updated, "productUpdate", "productUpdate");
-		console.log(`product exists, updated: ${product.id}`);
-	}
-
-	let variantId = product.variants?.[0]?.id;
-	if (!variantId) {
-		const v = await saleor(
-			`mutation($input: ProductVariantCreateInput!) { productVariantCreate(input: $input) { productVariant { id } errors { field message } } }`,
-			{ input: { product: product.id, sku: item.sku, name: "Monthly", trackInventory: false, attributes: [] } },
+		assertNoErrors(listed, "productChannelListingUpdate", "productChannelListingUpdate");
+		const priced = await saleor(
+			`mutation($id: ID!, $input: [ProductVariantChannelListingAddInput!]!) { productVariantChannelListingUpdate(id: $id, input: $input) { variant { id } errors { field message } } }`,
+			{ id: variantId, input: [{ channelId: channel.id, price: item.price }] },
 		);
-		assertNoErrors(v, "productVariantCreate", "productVariantCreate");
-		variantId = v.productVariantCreate.productVariant.id;
-		console.log(`created variant ${variantId}`);
-	}
+		assertNoErrors(priced, "productVariantChannelListingUpdate", "productVariantChannelListingUpdate");
+		console.log(`listed (${item.availableForPurchase ? "buyable" : "signup-only"}) + priced at $${item.price}/month on ${CHANNEL_SLUG}`);
 
-	const listed = await saleor(
-		`mutation($id: ID!, $input: ProductChannelListingUpdateInput!) { productChannelListingUpdate(id: $id, input: $input) { product { id } errors { field message } } }`,
-		{ id: product.id, input: { updateChannels: [{ channelId: channel.id, isPublished: true, visibleInListings: true, isAvailableForPurchase: true }] } },
-	);
-	assertNoErrors(listed, "productChannelListingUpdate", "productChannelListingUpdate");
-	const priced = await saleor(
-		`mutation($id: ID!, $input: [ProductVariantChannelListingAddInput!]!) { productVariantChannelListingUpdate(id: $id, input: $input) { variant { id } errors { field message } } }`,
-		{ id: variantId, input: [{ channelId: channel.id, price: item.price }] },
-	);
-	assertNoErrors(priced, "productVariantChannelListingUpdate", "productVariantChannelListingUpdate");
-	console.log(`listed + priced at $${item.price}/month on ${CHANNEL_SLUG}`);
-
-	if ((product.media ?? []).length === 0) {
-		for (const [file, alt] of item.images) console.log(`image ${(await uploadMedia(product.id, file, alt)).id} <- ${file}`);
-	} else {
-		console.log(`product already has ${product.media.length} image(s); not re-uploading`);
-	}
+		const imagesCurrent = (product.metadata ?? []).some((m) => m.key === "roverImagesVersion" && m.value === IMAGES_VERSION);
+		if (imagesCurrent && (product.media ?? []).length > 0) {
+			console.log(`images already at version ${IMAGES_VERSION}; not re-uploading`);
+		} else {
+			for (const m of product.media ?? []) {
+				const del = await saleor(`mutation($id: ID!) { productMediaDelete(id: $id) { errors { field message } } }`, { id: m.id });
+				assertNoErrors(del, "productMediaDelete", "productMediaDelete");
+				console.log(`removed old image ${m.id}`);
+			}
+			for (const [file, alt] of item.images) console.log(`image ${(await uploadMedia(product.id, file, alt)).id} <- ${file}`);
+		}
 	console.log(`Done: ${product.id} (${item.slug})`);
+	}
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
